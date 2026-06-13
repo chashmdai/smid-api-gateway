@@ -44,7 +44,7 @@ profundidad).
 | Componente   | Versión / Detalle                                         |
 |--------------|-----------------------------------------------------------|
 | Java         | 21                                                        |
-| Spring Boot  | 3.5.14                                                     |
+| Spring Boot  | 3.5.15                                                     |
 | Spring Cloud | 2025.0.2 (`spring-cloud-starter-gateway-server-webflux`)  |
 | Seguridad    | Spring Security + OAuth2 Resource Server (reactivo)       |
 | JWT          | Nimbus JOSE+JWT — verificación HS256 con selección por `kid` |
