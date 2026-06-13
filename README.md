@@ -311,10 +311,39 @@ incluido token inválido), **B5** (CORS por entorno), **B6** (rutas del Núcleo)
 ```bash
 cp .env.example .env
 # editar .env: definir al menos JWT_SECRET
+# JWT_SECRET, JWT_ISSUER y JWT_AUDIENCE deben coincidir con smid-auth
 set -a && source .env && set +a
 
 ./mvnw spring-boot:run
 ```
+
+En Windows/PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+# editar .env: definir al menos JWT_SECRET
+Get-Content .env | Where-Object { $_ -and $_ -notmatch '^\s*#' } | ForEach-Object {
+  $name, $value = $_ -split '=', 2
+  Set-Item -Path "Env:$name" -Value $value
+}
+
+.\mvnw.cmd spring-boot:run
+```
+
+En VS Code existe la configuración **Run API Gateway (local)** en
+`.vscode/launch.json`. Esta carga `${workspaceFolder}/.env`; el archivo `.env`
+es local, está ignorado por Git y no debe contenerse en commits.
+
+Para conversar con `smid-auth` en local:
+
+- `smid-auth` debe estar arriba en `http://localhost:8081`.
+- `AUTH_SERVICE_URL` debe apuntar a `http://localhost:8081`.
+- El `kid` activo de `smid-auth` debe existir en el mapa `smid.jwt.claves` del
+  Gateway. En local, ambos repos usan `smid-2026-06`.
+- `JWT_SECRET`, `JWT_ISSUER` y `JWT_AUDIENCE` deben coincidir byte a byte entre
+  `smid-auth` y este Gateway.
+- Para frontends locales se puede usar
+  `CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173`.
 
 ### Pruebas
 ```bash
@@ -344,6 +373,38 @@ java -jar target/api-gateway-1.0.0.jar
 curl -s http://localhost:8080/actuator/health
 # {"status":"UP"}
 ```
+
+### Smoke test con `smid-auth`
+
+Con `smid-auth` y el Gateway levantados:
+
+```powershell
+$login = Invoke-RestMethod `
+  -Method Post `
+  -Uri http://localhost:8080/api/auth/login `
+  -ContentType 'application/json' `
+  -Body (@{
+    email = 'admin@defensorianinez.cl'
+    password = 'Smid.Local.2026'
+  } | ConvertTo-Json)
+
+$login.expiraEn
+$login.usuario.roles
+```
+
+Una llamada protegida con un token válido debe superar la seguridad del Gateway:
+
+```powershell
+Invoke-WebRequest `
+  -Method Get `
+  -Uri http://localhost:8080/api/personas/abc `
+  -Headers @{ Authorization = "Bearer $($login.accessToken)" } `
+  -SkipHttpErrorCheck
+```
+
+Si `personas-service` no está levantado en `localhost:8088`, la respuesta
+esperada es `503 GTW-001`: eso confirma que el JWT fue aceptado y que el fallo
+ya está en el destino downstream, no en la integración Gateway/Auth.
 
 En producción el Gateway es el único componente expuesto; los microservicios
 viven detrás de él. Inyecte la configuración por gestor de secretos / variables
