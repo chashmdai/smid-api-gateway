@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ============================================================================
+  API GATEWAY SMID - Defensoría de los Derechos de la Niñez
+  ============================================================================
+  Rewrite total del Gateway legado conforme a la Auditoría y Plan de
+  Refactorización (auditoria-refactor-gateway.md) y al Núcleo Fundacional SMID.
+
+  Decisiones de construcción:
+    - Se retira Lombok: el código nuevo usa records de Java 21 y constructores
+      explícitos (menos magia de compilación, misma legibilidad).
+    - Se usa el starter canónico de Spring Cloud 2025.0.x para el Gateway
+      reactivo: spring-cloud-starter-gateway-server-webflux (el artefacto
+      spring-cloud-starter-gateway quedó como alias deprecado).
+    - spring-boot-configuration-processor genera la metadata de las
+      propiedades smid.jwt.* y smid.cors.* para autocompletado en el IDE
+      (reemplaza el additional-spring-configuration-metadata.json manual).
+    - reactor-test habilita StepVerifier en las pruebas del decoder reactivo.
+  ============================================================================
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>3.5.15</version>
+		<relativePath/> <!-- se resuelve desde el repositorio -->
+	</parent>
+
+	<groupId>cl.smid</groupId>
+	<artifactId>api-gateway</artifactId>
+	<version>1.0.0</version>
+	<name>api-gateway</name>
+	<description>
+		API Gateway del ecosistema SMID — Defensoría de la Niñez.
+		Valida el contrato de claims 2.4 (kid/iss/aud/exp), normaliza errores
+		al sobre unificado 2.5 y enruta al núcleo fundacional y a los legados
+		del patrón strangler.
+	</description>
+
+	<properties>
+		<java.version>21</java.version>
+		<spring-cloud.version>2025.0.2</spring-cloud.version>
+	</properties>
+
+	<dependencies>
+		<!-- Observabilidad: /actuator/health e /actuator/info del propio Gateway -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+
+		<!-- Cadena de filtros reactiva de Spring Security -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+
+		<!--
+		  Resource Server OAuth2: aporta NimbusReactiveJwtDecoder, los
+		  validadores de claims (iss/aud/exp) y la librería nimbus-jose-jwt
+		  con la que se construye el selector de clave por `kid` (DT-3).
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+		</dependency>
+
+		<!-- Núcleo reactivo del Gateway (Spring Cloud Gateway sobre Netty/WebFlux) -->
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-gateway-server-webflux</artifactId>
+		</dependency>
+
+		<!--
+		  Genera META-INF/spring-configuration-metadata.json a partir de los
+		  records @ConfigurationProperties (PropiedadesJwt, PropiedadesCors).
+		  Sustituye la metadata manual del proyecto legado.
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-configuration-processor</artifactId>
+			<optional>true</optional>
+		</dependency>
+
+		<!-- Recarga en caliente solo para desarrollo; excluido del jar empaquetado -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-devtools</artifactId>
+			<scope>runtime</scope>
+			<optional>true</optional>
+		</dependency>
+
+		<!-- ====================== Pruebas ====================== -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- StepVerifier para probar el decoder reactivo (Mono<Jwt>) -->
+		<dependency>
+			<groupId>io.projectreactor</groupId>
+			<artifactId>reactor-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-dependencies</artifactId>
+				<version>${spring-cloud.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+		</plugins>
+	</build>
+
+</project>

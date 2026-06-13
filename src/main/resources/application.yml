@@ -1,0 +1,158 @@
+# =============================================================================
+# API GATEWAY SMID - Configuración (DT-2: cero secretos en archivos)
+# =============================================================================
+# Este archivo contiene ÚNICAMENTE referencias ${VARIABLE}. Los valores reales
+# viven en variables de entorno (ver .env.example). Las variables sin default
+# (JWT_SECRET) son obligatorias: el Gateway no arranca sin ellas — fallo rápido
+# y visible, por diseño.
+#
+# NOTA: spring.threads.virtual.enabled fue RETIRADO deliberadamente. Es inerte
+# en un Gateway WebFlux/Netty (los hilos virtuales aplican al stack servlet) y
+# documentaba una capacidad inexistente (hallazgo §3 de la auditoría).
+# =============================================================================
+
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          # ---------------------------------------------------------------
+          # Cliente HTTP hacia los destinos. Los timeouts existen para que
+          # los códigos del catálogo sean alcanzables y deterministas:
+          #   - conexión rechazada / DNS  -> 503 GTW-001
+          #   - respuesta fuera de plazo  -> 504 GTW-002
+          # ---------------------------------------------------------------
+          httpclient:
+            connect-timeout: ${GATEWAY_CONNECT_TIMEOUT_MS:5000}   # milisegundos
+            response-timeout: ${GATEWAY_RESPONSE_TIMEOUT:30s}     # Duration ISO
+
+          # ---------------------------------------------------------------
+          # RUTAS. CORS NO se declara aquí: lo gobierna el único bean
+          # corsConfigurationSource de SeguridadConfig (evita cabeceras
+          # duplicadas, mecanismo conservado de la auditoría §3).
+          #
+          # Núcleo SMID: StripPrefix=1 estándar (se recorta solo /api); la
+          # ruta interna conserva el prefijo del servicio, igual que el
+          # smid-auth ya implementado (decisión D6 de la auditoría).
+          # Legados: conservan su StripPrefix actual durante el strangler
+          # (decisión D7); solo se externalizan sus URIs.
+          # ---------------------------------------------------------------
+          routes:
+            # ===== NÚCLEO FUNDACIONAL SMID =====
+
+            # 6.1 Identidad y Acceso  ->  /auth/** en el destino
+            - id: auth-service
+              uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+              predicates:
+                - Path=/api/auth/**
+              filters:
+                - StripPrefix=1
+
+            # 6.7 Catálogo de Derechos  ->  /catalogo/** en el destino
+            - id: catalogo-service
+              uri: ${CATALOGO_SERVICE_URL:http://localhost:8087}
+              predicates:
+                - Path=/api/catalogo/**
+              filters:
+                - StripPrefix=1
+
+            # 6.2 Personas  ->  /personas/** en el destino
+            - id: personas-service
+              uri: ${PERSONAS_SERVICE_URL:http://localhost:8088}
+              predicates:
+                - Path=/api/personas/**
+              filters:
+                - StripPrefix=1
+
+            # 6.3 Requerimientos  ->  /requerimientos/** en el destino
+            - id: requerimientos-service
+              uri: ${REQUERIMIENTOS_SERVICE_URL:http://localhost:8089}
+              predicates:
+                - Path=/api/requerimientos/**
+              filters:
+                - StripPrefix=1
+
+            # ===== LEGADOS (patrón strangler, sin cambios funcionales) =====
+
+            # SIGER - Core legado
+            - id: siger-service
+              uri: ${SIGER_SERVICE_URL:http://localhost:8082}
+              predicates:
+                - Path=/api/siger/**
+              filters:
+                - StripPrefix=2
+
+            # SGS - Seguimiento. StripPrefix=0 preserva el COMPORTAMIENTO REAL
+            # del YAML legado (el README antiguo decía 2; discrepancia
+            # documentada en la auditoría §3 — cambiarlo exige prueba E2E).
+            - id: sgs-service
+              uri: ${SGS_SERVICE_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/sgs/**
+              filters:
+                - StripPrefix=0
+
+            # PRO NIÑEZ - IA
+            - id: proninez-service
+              uri: ${PRONINEZ_SERVICE_URL:http://localhost:8084}
+              predicates:
+                - Path=/api/proninez/**
+              filters:
+                - StripPrefix=2
+
+            # SMID - Core legado
+            - id: smid-service
+              uri: ${SMID_SERVICE_URL:http://localhost:8085}
+              predicates:
+                - Path=/api/smid/**
+              filters:
+                - StripPrefix=2
+
+            # ESNNA - Motor IA. StripPrefix=0: su controlador espera la ruta
+            # completa /api/esnna/** (asimetría deliberada del legado).
+            - id: esnna-motor-service
+              uri: ${ESNNA_SERVICE_URL:http://localhost:8086}
+              predicates:
+                - Path=/api/esnna/**
+              filters:
+                - StripPrefix=0
+
+# =============================================================================
+# CONTRATO JWT (Núcleo 2.4 / DT-3): mapa kid -> secreto.
+# El Gateway NO firma tokens, solo los valida; por eso no necesita kid-activo.
+# Durante una ventana de rotación se cargan DOS claves (vigente + anterior):
+# los tokens viejos siguen validando por su kid hasta expirar, sin caída.
+# =============================================================================
+smid:
+  jwt:
+    emisor: ${JWT_ISSUER:smid-auth}
+    audiencia: ${JWT_AUDIENCE:smid-servicios}
+    claves:
+      "[smid-2026-06]": ${JWT_SECRET}
+      # Descomentar SOLO durante la ventana de rotación de clave:
+      # "[smid-2026-01]": ${JWT_SECRET_ANTERIOR}
+
+  # CORS gobernado por entorno (DT-7). Lista separada por comas.
+  cors:
+    origenes-permitidos: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+
+# =============================================================================
+# ACTUATOR ENDURECIDO (brecha B7): solo health e info del PROPIO Gateway.
+# Los actuators de los servicios downstream NO se exponen (no existe ruta
+# /api/actuator/** ni regla pública que los alcance).
+# =============================================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    "[cl.smid.apigateway]": INFO
