@@ -1,0 +1,20 @@
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+    urls:
+      - name: Auth
+        url: ${AUTH_SERVICE_URL:http://localhost:8081}/v3/api-docs
+      - name: Personas
+        url: ${PERSONAS_SERVICE_URL:http://localhost:8088}/v3/api-docs
+      - name: Requerimientos
+        url: ${REQUERIMIENTOS_SERVICE_URL:http://localhost:8089}/v3/api-docs
+      - name: Catalogo
+        url: ${CATALOGO_SERVICE_URL:http://localhost:8087}/v3/api-docs
+      - name: Casos
+        url: ${CASOS_SERVICE_URL:http://localhost:8090}/v3/api-docs
+      - name: Vulneraciones
+        url: ${VULNERACIONES_SERVICE_URL:http://localhost:8091}/v3/api-docs
+      - name: Productos
+        url: ${PRODUCTOS_SERVICE_URL:http://localhost:8092}/v3/api-docs

@@ -29,8 +29,8 @@ spring:
           #   - respuesta fuera de plazo  -> 504 GTW-002
           # ---------------------------------------------------------------
           httpclient:
-            connect-timeout: ${GATEWAY_CONNECT_TIMEOUT_MS:5000}   # milisegundos
-            response-timeout: ${GATEWAY_RESPONSE_TIMEOUT:30s}     # Duration ISO
+            connect-timeout: ${GATEWAY_CONNECT_TIMEOUT_MS:5000} # milisegundos
+            response-timeout: ${GATEWAY_RESPONSE_TIMEOUT:30s} # Duration ISO
 
           # ---------------------------------------------------------------
           # RUTAS. CORS NO se declara aquí: lo gobierna el único bean
@@ -75,6 +75,13 @@ spring:
               uri: ${REQUERIMIENTOS_SERVICE_URL:http://localhost:8089}
               predicates:
                 - Path=/api/requerimientos/**
+              filters:
+                - StripPrefix=1
+                # 6.4 Casos -> /casos/** en el destino
+            - id: casos-service
+              uri: ${CASOS_SERVICE_URL:http://localhost:8090}
+              predicates:
+                - Path=/api/casos/**
               filters:
                 - StripPrefix=1
 
@@ -152,6 +159,14 @@ management:
     web:
       exposure:
         include: health,info
+
+# Swagger/OpenAPI del Gateway esta deshabilitado por defecto. Solo se habilita
+# en los perfiles local/dev como agregador de contratos remotos.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
 
 logging:
   level:

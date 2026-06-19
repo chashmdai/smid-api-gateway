@@ -49,6 +49,7 @@ profundidad).
 | Seguridad    | Spring Security + OAuth2 Resource Server (reactivo)       |
 | JWT          | Nimbus JOSE+JWT — verificación HS256 con selección por `kid` |
 | Runtime web  | WebFlux / Netty (no servlet)                              |
+| OpenAPI      | SpringDoc OpenAPI 2.8.x — Swagger UI como agregador local/dev |
 | Build        | Maven                                                     |
 | Pruebas      | JUnit 5, Reactor Test (`StepVerifier`), `WebTestClient`   |
 
@@ -119,6 +120,39 @@ que `smid-auth`). Los legados conservan su `StripPrefix` histórico durante el
 > el servicio SGS, no una edición silenciosa en este rewrite.
 
 Una petición a una ruta no mapeada produce `404 GTW-404`.
+
+### Swagger UI agregador
+
+El Gateway no es la fuente del contrato funcional de los servicios. Cada
+microservicio publica su propio `/v3/api-docs`; el Gateway solo ofrece, en
+perfiles `local` y `dev`, un Swagger UI con selector para consultar esos
+contratos remotos desde un punto común.
+
+Con el perfil `local` o `dev` activo:
+
+```text
+GET /swagger-ui/index.html
+GET /v3/api-docs
+```
+
+El selector lista los contratos de Auth, Personas, Requerimientos, Catálogo,
+Casos, Vulneraciones y Productos usando las URLs locales/dev de cada servicio:
+
+| Servicio | Contrato remoto por defecto | Ruta externa de consumo |
+|----------|-----------------------------|--------------------------|
+| Auth | `http://localhost:8081/v3/api-docs` | `/api/auth/**` |
+| Personas | `http://localhost:8088/v3/api-docs` | `/api/personas/**` |
+| Requerimientos | `http://localhost:8089/v3/api-docs` | `/api/requerimientos/**` |
+| Catálogo | `http://localhost:8087/v3/api-docs` | `/api/catalogo/**` |
+| Casos | `http://localhost:8090/v3/api-docs` | `/api/casos/**` |
+| Vulneraciones | `http://localhost:8091/v3/api-docs` | `/api/vulneraciones/**` cuando exista ruta registrada |
+| Productos | `http://localhost:8092/v3/api-docs` | `/api/productos/**` cuando exista ruta registrada |
+
+En producción SpringDoc queda deshabilitado por defecto y las rutas
+`/swagger-ui/**` y `/v3/api-docs/**` no son públicas. El frontend consume las APIs
+por el Gateway bajo `/api/{servicio}`, pero los contratos reales se mantienen en
+los microservicios que implementan cada dominio. El selector Swagger no crea ni
+modifica rutas de negocio.
 
 ---
 
@@ -248,12 +282,16 @@ Gateway no arranca sin él (fallo rápido y visible). Plantilla completa en
 | `JWT_AUDIENCE`                | No          | `smid-servicios`         | Audiencia esperada (`aud`)                    |
 | `CORS_ALLOWED_ORIGINS`        | No          | `http://localhost:3000`  | Orígenes permitidos (lista por comas)         |
 | `SERVER_PORT`                 | No          | `8080`                   | Puerto del Gateway                            |
+| `SPRING_PROFILES_ACTIVE`      | No          | —                        | Usar `local` o `dev` para habilitar Swagger UI agregador |
 | `GATEWAY_CONNECT_TIMEOUT_MS`  | No          | `5000`                   | Timeout de conexión (ms) → habilita `GTW-001` |
 | `GATEWAY_RESPONSE_TIMEOUT`    | No          | `30s`                    | Timeout de respuesta → habilita `GTW-002`     |
 | `AUTH_SERVICE_URL`            | No          | `http://localhost:8081`  | Destino de Identidad                          |
 | `CATALOGO_SERVICE_URL`        | No          | `http://localhost:8087`  | Destino de Catálogo                           |
 | `PERSONAS_SERVICE_URL`        | No          | `http://localhost:8088`  | Destino de Personas                           |
 | `REQUERIMIENTOS_SERVICE_URL`  | No          | `http://localhost:8089`  | Destino de Requerimientos                     |
+| `CASOS_SERVICE_URL`           | No          | `http://localhost:8090`  | Destino/contrato de Casos                     |
+| `VULNERACIONES_SERVICE_URL`   | No          | `http://localhost:8091`  | Contrato de Vulneraciones en Swagger UI local/dev |
+| `PRODUCTOS_SERVICE_URL`       | No          | `http://localhost:8092`  | Contrato de Productos en Swagger UI local/dev |
 | `SIGER_SERVICE_URL`           | No          | `http://localhost:8082`  | Destino legado SIGER                          |
 | `SGS_SERVICE_URL`             | No          | `http://localhost:8083`  | Destino legado SGS                            |
 | `PRONINEZ_SERVICE_URL`        | No          | `http://localhost:8084`  | Destino legado PRO NIÑEZ                       |
@@ -312,6 +350,7 @@ incluido token inválido), **B5** (CORS por entorno), **B6** (rutas del Núcleo)
 cp .env.example .env
 # editar .env: definir al menos JWT_SECRET
 # JWT_SECRET, JWT_ISSUER y JWT_AUDIENCE deben coincidir con smid-auth
+# SPRING_PROFILES_ACTIVE=local habilita Swagger UI agregador
 set -a && source .env && set +a
 
 ./mvnw spring-boot:run
@@ -344,6 +383,9 @@ Para conversar con `smid-auth` en local:
   `smid-auth` y este Gateway.
 - Para frontends locales se puede usar
   `CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173`.
+- Con `SPRING_PROFILES_ACTIVE=local`, Swagger UI del Gateway queda disponible en
+  `http://localhost:8080/swagger-ui/index.html` y permite seleccionar los
+  contratos publicados por cada microservicio.
 
 ### Pruebas
 ```bash

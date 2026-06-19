@@ -6,6 +6,7 @@ import cl.smid.apigateway.infraestructura.auditoria.FiltroAuditoria;
 import cl.smid.apigateway.infraestructura.seguridad.DecodificadorJwtPorKid;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.config.Customizer;
@@ -21,6 +22,7 @@ import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -63,9 +65,12 @@ public class SeguridadConfig {
 	private static final long MAX_EDAD_PREFLIGHT_SEGUNDOS = 3600L;
 
 	private final EscritorRespuestaError escritorError;
+	private final boolean documentacionLocalHabilitada;
 
-	public SeguridadConfig(EscritorRespuestaError escritorError) {
+	public SeguridadConfig(EscritorRespuestaError escritorError, Environment environment) {
 		this.escritorError = escritorError;
+		this.documentacionLocalHabilitada = Arrays.stream(environment.getActiveProfiles())
+				.anyMatch(perfil -> "local".equals(perfil) || "dev".equals(perfil));
 	}
 
 	/**
@@ -83,16 +88,21 @@ public class SeguridadConfig {
 				.csrf(ServerHttpSecurity.CsrfSpec::disable)
 				// CORS gobernado por el único bean corsConfigurationSource.
 				.cors(Customizer.withDefaults())
-				.authorizeExchange(intercambios -> intercambios
+				.authorizeExchange(intercambios -> {
 						// Preflight CORS: nunca lleva credencial, siempre pasa.
-						.pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+						intercambios.pathMatchers(HttpMethod.OPTIONS, "/**").permitAll();
+						if (documentacionLocalHabilitada) {
+							intercambios.pathMatchers("/swagger-ui/**", "/swagger-ui.html",
+									"/webjars/swagger-ui/**", "/v3/api-docs/**").permitAll();
+						}
 						// Autenticación: valida credenciales en su propio cuerpo.
-						.pathMatchers("/api/auth/**").permitAll()
+						intercambios.pathMatchers("/api/auth/**").permitAll()
 						// Actuator PROPIO del Gateway, endurecido (B7).
 						.pathMatchers("/actuator/health", "/actuator/health/**",
 								"/actuator/info").permitAll()
 						// Resto del tráfico: token válido obligatorio.
-						.anyExchange().authenticated())
+						.anyExchange().authenticated();
+				})
 				// 401 / 403 con el sobre unificado en el nivel de excepción.
 				.exceptionHandling(excepciones -> excepciones
 						.authenticationEntryPoint(this::responder401)
