@@ -93,7 +93,8 @@ public class SeguridadConfig {
 						intercambios.pathMatchers(HttpMethod.OPTIONS, "/**").permitAll();
 						if (documentacionLocalHabilitada) {
 							intercambios.pathMatchers("/swagger-ui/**", "/swagger-ui.html",
-									"/webjars/swagger-ui/**", "/v3/api-docs/**").permitAll();
+									"/webjars/swagger-ui/**", "/v3/api-docs/**",
+									"/openapi/**").permitAll();
 						}
 						// Autenticación: valida credenciales en su propio cuerpo.
 						intercambios.pathMatchers("/api/auth/**").permitAll()

@@ -138,15 +138,19 @@ GET /v3/api-docs
 El selector lista los contratos de Auth, Personas, Requerimientos, Catálogo,
 Casos, Vulneraciones y Productos usando las URLs locales/dev de cada servicio:
 
-| Servicio | Contrato remoto por defecto | Ruta externa de consumo |
-|----------|-----------------------------|--------------------------|
-| Auth | `http://localhost:8081/v3/api-docs` | `/api/auth/**` |
-| Personas | `http://localhost:8088/v3/api-docs` | `/api/personas/**` |
-| Requerimientos | `http://localhost:8089/v3/api-docs` | `/api/requerimientos/**` |
-| Catálogo | `http://localhost:8087/v3/api-docs` | `/api/catalogo/**` |
-| Casos | `http://localhost:8090/v3/api-docs` | `/api/casos/**` |
-| Vulneraciones | `http://localhost:8091/v3/api-docs` | `/api/vulneraciones/**` cuando exista ruta registrada |
-| Productos | `http://localhost:8092/v3/api-docs` | `/api/productos/**` cuando exista ruta registrada |
+| Servicio | URL del selector en Gateway | Contrato remoto por defecto |
+|----------|-----------------------------|-----------------------------|
+| Auth | `/openapi/auth/v3/api-docs` | `http://localhost:8081/v3/api-docs` |
+| Personas | `/openapi/personas/v3/api-docs` | `http://localhost:8088/v3/api-docs` |
+| Requerimientos | `/openapi/requerimientos/v3/api-docs` | `http://localhost:8089/v3/api-docs` |
+| Catálogo | `/openapi/catalogo/v3/api-docs` | `http://localhost:8087/v3/api-docs` |
+| Casos | `/openapi/casos/v3/api-docs` | `http://localhost:8090/v3/api-docs` |
+| Vulneraciones | `/openapi/vulneraciones/v3/api-docs` | `http://localhost:8091/v3/api-docs` |
+| Productos | `/openapi/productos/v3/api-docs` | `http://localhost:8092/v3/api-docs` |
+
+El proxy `/openapi/{servicio}/v3/api-docs` existe solo en `local`/`dev` para
+evitar problemas CORS del navegador cuando Swagger UI, servido desde el Gateway,
+carga contratos publicados por otros puertos.
 
 En producción SpringDoc queda deshabilitado por defecto y las rutas
 `/swagger-ui/**` y `/v3/api-docs/**` no son públicas. El frontend consume las APIs
